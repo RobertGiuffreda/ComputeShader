@@ -3,3 +3,5 @@
 *.vcxproj
 *.vcxproj.filters
 *.vcxproj.user
+
+thirdparty/glfw/docs/
