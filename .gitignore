@@ -5,3 +5,18 @@
 *.vcxproj.user
 
 thirdparty/glfw/docs/
+
+x64/
+ComputeShader/x64
+
+ComputeShader/src/VertexArray.cpp
+ComputeShader/src/VertexArray.h
+
+ComputeShader/src/VertexBuffer.cpp
+ComputeShader/src/VertexBuffer.h
+
+ComputeShader/src/IndexBuffer.cpp
+ComputeShader/src/IndexBuffer.h
+
+ComputeShader/src/Renderer.cpp
+ComputeShader/src/Renderer.h
