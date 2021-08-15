@@ -19,11 +19,11 @@ const float TEX_HEIGHT = 720.0f;
 
 const float move_dist = 10.0f;
 const float sensor_angle = glm::radians(45.0f);
-const float sensor_dist = 10.0f;
+const float sensor_dist = 20.0f;
 const float turn_speed = 5.0f;
 
 /* Dissapation and decay */
-const float decay_rate = 1.0f;
+const float decay_rate = 0.08f;
 const float blur_factor = 1.0f;
 
 /* Number of Particles */
@@ -88,7 +88,7 @@ int main(void)
 		float third_h = uniform() * TEX_HEIGHT;
 		particles[i].pos = glm::vec2(third_w, third_h);
 		/* Get direction to point towards center */
-		particles[i].dir = glm::radians(90.0f);
+		particles[i].dir = glm::radians(270.0f);
 		particles[i].pad = 0;
 	}
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);

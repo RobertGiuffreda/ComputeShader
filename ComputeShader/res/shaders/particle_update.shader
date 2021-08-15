@@ -60,7 +60,7 @@ void main()
 {
 	uint gid = gl_GlobalInvocationID.x;
 
-	float random = p_map[gid].pos.x * gid + p_map[gid].pos.y;
+	float random = p_map[gid].pos.x * gid + p_map[gid].pos.y * width;
 
 	float random_turn = hash(random) * 2 * 3.1415f;
 
@@ -95,15 +95,11 @@ void main()
  /* Keep particle in boundry 
 	Temprarily bounce without randomness 
 	6.28 used as bad 2PI for now */
-	if (n_pos.x < 0 || n_pos.x >= width)
+	if (n_pos.x < 0 || n_pos.x >= width || n_pos.y < 0 || n_pos.y >= height)
 	{
 		n_pos.x = min(width - 0.01f, max(n_pos.x, 0.0f));
-		p_map[gid].dir = hash(random);
-	}
-	if (n_pos.y < 0 || n_pos.y >= height)
-	{
 		n_pos.y = min(height - 0.01f, max(n_pos.y, 0.0f));
-		p_map[gid].dir = hash(random);;
+		p_map[gid].dir = hash(random) * 6.28;
 	}
 
 	// Update the ssbo's data with new data
