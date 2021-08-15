@@ -53,6 +53,11 @@ void ComputeShader::SetUniform1i(const std::string& name, int value)
     glUniform1i(GetUniformLocation(name), value);
 }
 
+void ComputeShader::SetUniform1f(const std::string& name, float value)
+{
+    glUniform1f(GetUniformLocation(name), value);
+}
+
 int ComputeShader::GetUniformLocation(const std::string& name)
 {
     int location = glGetUniformLocation(id, name.c_str());

@@ -10,13 +10,27 @@
 
 void Print_Group_Values();
 
+/* Sensor is in degrees */
 const float SCR_WIDTH = 720.0f;
-const float SCR_HEIGHT = 480.0f;
+const float SCR_HEIGHT = 720.0f;
 
-const float TEX_WIDTH = 240.0f;
-const float TEX_HEIGHT = 160.0f;
+const float TEX_WIDTH = 720.0f;
+const float TEX_HEIGHT = 720.0f;
 
-const unsigned int PNUM = 512;
+const float move_dist = 10.0f;
+const float sensor_angle = glm::radians(45.0f);
+const float sensor_dist = 10.0f;
+const float turn_speed = 5.0f;
+
+/* Dissapation and decay */
+const float decay_rate = 1.0f;
+const float blur_factor = 1.0f;
+
+/* Number of Particles */
+const unsigned int PNUM = 300000;
+
+float delta_time = 0.0f;
+float last_frame = 0.0f;
 
 int main(void)
 {
@@ -36,6 +50,7 @@ int main(void)
 
 	/* Make windows context current */
 	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1);
 
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 	{
@@ -44,10 +59,15 @@ int main(void)
 		return -1;
 	}
 
-	/* Create the Particle map. Shader storage buffer object of particle positions and directions */
+	/*
+	 * Create the Particle map. Shader storage buffer object of particle positions and directions 
+	 * There are issues with padding and Shader Storage Buffer Objects.
+	 * vec2 and a scalar will cause issue. Thus the padding
+	 */
 	struct particle {
 		glm::vec2 pos;
-		float direction;
+		float dir;
+		float pad;
 	};
 
 	unsigned int ssbo = 0;
@@ -61,11 +81,15 @@ int main(void)
 	* Unmap the buffer before use again
 	*/
 	int buffmask = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT;
-	struct particle* particles = (struct particle*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, PNUM * sizeof(struct particle), buffmask);
+	struct particle *particles = (struct particle *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, PNUM * sizeof(struct particle), buffmask);
 	for (int i = 0; i < PNUM; i++)
 	{
-		particles[i].pos = glm::vec2(uniform() * SCR_WIDTH, uniform() * SCR_HEIGHT);
-		particles[i].direction = uniform() * 360;
+		float third_w = uniform() * TEX_WIDTH;
+		float third_h = uniform() * TEX_HEIGHT;
+		particles[i].pos = glm::vec2(third_w, third_h);
+		/* Get direction to point towards center */
+		particles[i].dir = glm::radians(90.0f);
+		particles[i].pad = 0;
 	}
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
@@ -73,7 +97,7 @@ int main(void)
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-	/* Create the Trailmap to be passed to the compute shader */
+	// Create framebuffer and attach trail_map to use render as a copy
 	unsigned int trail_map;
 	glGenTextures(1, &trail_map);
 	glActiveTexture(GL_TEXTURE0);
@@ -82,22 +106,47 @@ int main(void)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TEX_WIDTH, TEX_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
 	glBindImageTexture(0, trail_map, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+	unsigned int blur_trail_map;
+	glGenTextures(1, &blur_trail_map);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, blur_trail_map);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TEX_WIDTH, TEX_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+	glBindImageTexture(1, blur_trail_map, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
 
 	/* Create compute shader to zero the texture */
 	ComputeShader compshader("res/shaders/zero_tex.shader");
 	compshader.Bind();
-	glDispatchCompute((unsigned int)SCR_WIDTH, (unsigned int)SCR_HEIGHT, 1);
+	glDispatchCompute((unsigned int)TEX_WIDTH, (unsigned int)TEX_HEIGHT, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-
+	/* Create compute shader to update particle positions */
 	ComputeShader p_update("res/shaders/particle_update.shader");
 	p_update.Bind();
-	glDispatchCompute(PNUM, 1, 1);
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	p_update.SetUniform1f("width", TEX_WIDTH);
+	p_update.SetUniform1f("height", TEX_HEIGHT);
+	p_update.SetUniform1f("move_dist", move_dist);
+	p_update.SetUniform1f("sensor_dist", sensor_dist);
+	p_update.SetUniform1f("sensor_angle", sensor_angle);
+	p_update.SetUniform1f("turn_speed", turn_speed);
 
-	/* Create shader to display texture and sex uniform texture */
+	/* Create diffuse and decay compute shader */
+	ComputeShader decay("res/shaders/trail_update.shader");
+	decay.Bind();
+	decay.SetUniform1f("decay_rate", decay_rate);
+	decay.SetUniform1f("blur_factor", blur_factor);
+
+	ComputeShader copy("res/shaders/copy_texture.shader");
+	copy.Bind();
+
+	/* Create shader to display texture */
 	Shader shader("res/shaders/vertex.shader", "res/shaders/fragment.shader");
 	shader.Bind();
 	shader.SetUniform1i("particle_tex", 0);
@@ -140,13 +189,35 @@ int main(void)
 	/* Loop until user closes the window */
 	while (!glfwWindowShouldClose(window))
 	{
+		float curr_frame = (float)glfwGetTime();
+		delta_time = curr_frame - last_frame;
+		last_frame = curr_frame;
+
 		/* Render here */
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		/* Display Screen Sized Texture */
+		/* Call particle update compute shader */
+		p_update.Bind();
+		p_update.SetUniform1f("delta_time", delta_time);
+		glDispatchCompute(PNUM, 1, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+
+		/* Call trail map update compute shader */
+		decay.Bind();
+		decay.SetUniform1f("delta_time", delta_time);
+		glDispatchCompute((unsigned int)TEX_WIDTH, (unsigned int)TEX_HEIGHT, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		/* Copy blur_map to trail_map */
+		copy.Bind();
+		glDispatchCompute((unsigned int)TEX_WIDTH, (unsigned int)TEX_HEIGHT, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		/* Texture stuff might not be necessary. P-sure its not actually */
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, trail_map);
-		
+
+		/* Display Screen Sized Texture */
 		shader.Bind();
 		glBindVertexArray(vao);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
@@ -162,6 +233,9 @@ int main(void)
 	glDeleteVertexArrays(1, &vao);
 	glDeleteBuffers(1, &vbo);
 	glDeleteBuffers(1, &ibo);
+	glDeleteTextures(1, &trail_map);
+	glDeleteTextures(1, &blur_trail_map);
+	glDeleteBuffers(1, &ssbo);
 	glfwTerminate();
 	return 0;
 }
