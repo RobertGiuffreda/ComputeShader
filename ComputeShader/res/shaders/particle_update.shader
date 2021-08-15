@@ -60,7 +60,7 @@ void main()
 {
 	uint gid = gl_GlobalInvocationID.x;
 
-	float random = p_map[gid].pos.x * gid + p_map[gid].pos.y * width;
+	float random = p_map[gid].pos.y * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x * p_map[gid].pos.y* 1000);
 
 	float random_turn = hash(random) * 2 * 3.1415f;
 
@@ -75,7 +75,7 @@ void main()
 	}
 	else if (forward_c < left_c && forward_c < right_c)
 	{
-		p_map[gid].dir += (random_turn - 0.5f) * 2 * turn_speed * delta_time;
+		p_map[gid].dir += (random_turn - 0.5f) * 2 * turn_speed *delta_time;
 	}
 	else if (right_c > left_c)
 	{
@@ -87,7 +87,7 @@ void main()
 	}
 
 	vec2 dir = vec2(cos(p_map[gid].dir), sin(p_map[gid].dir));
-	vec2 n_pos = p_map[gid].pos + (dir * move_dist * delta_time);
+	vec2 n_pos = p_map[gid].pos + dir * move_dist * delta_time;
 
 	/* Implementation of sensing and choosing path */
 	

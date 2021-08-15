@@ -16,15 +16,15 @@ void main()
 		for (int offY = -1; offY <= 1; offY++) {
 			ivec2 tmp_coord = ivec2(pixel_coords.x + offX, pixel_coords.y + offY);
 			vec3 tmp_color = imageLoad(trail_map, tmp_coord).xyz;
-			if (abs(offX) + abs(offY) == 2) tmp_color *= (1.0f / 16.0f);
-			if (abs(offX) + abs(offY) == 1) tmp_color *= (1.0f / 8.0f);
-			if (abs(offX) + abs(offY) == 0) tmp_color *= (1.0f / 4.0f);
+			if (abs(offX) + abs(offY) == 2) tmp_color *= (1.0f / 9.0f);
+			if (abs(offX) + abs(offY) == 1) tmp_color *= (1.0f / 9.0f);
+			if (abs(offX) + abs(offY) == 0) tmp_color *= (1.0f / 9.0f);
 			sum += tmp_color;
 		}
 	}
 	sum = mix(imageLoad(trail_map, pixel_coords).xyz, sum, blur_factor * delta_time);
 
 	/* Load image and reduce color to simulate decay */
-	sum -= (decay_rate * delta_time);
+	sum -= decay_rate * delta_time;
 	imageStore(blur_map, pixel_coords, vec4(sum, 1.0f));
 }

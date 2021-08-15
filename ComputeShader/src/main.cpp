@@ -10,24 +10,26 @@
 
 void Print_Group_Values();
 
-/* Sensor is in degrees */
-const float SCR_WIDTH = 720.0f;
-const float SCR_HEIGHT = 720.0f;
+const float radius = 200.0f;
 
-const float TEX_WIDTH = 720.0f;
-const float TEX_HEIGHT = 720.0f;
+/* Sensor is in degrees */
+const float SCR_WIDTH = 1080.0f;
+const float SCR_HEIGHT = 1080.0f;
+
+const float TEX_WIDTH = 1080.0f;
+const float TEX_HEIGHT = 1080.0f;
 
 const float move_dist = 10.0f;
 const float sensor_angle = glm::radians(45.0f);
-const float sensor_dist = 20.0f;
-const float turn_speed = 5.0f;
+const float sensor_dist = 40.0f;
+const float turn_speed = 1.5f;
 
 /* Dissapation and decay */
-const float decay_rate = 0.08f;
+const float decay_rate = 0.1f;
 const float blur_factor = 1.0f;
 
 /* Number of Particles */
-const unsigned int PNUM = 300000;
+const unsigned int PNUM = 1000000;
 
 float delta_time = 0.0f;
 float last_frame = 0.0f;
@@ -84,11 +86,17 @@ int main(void)
 	struct particle *particles = (struct particle *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, PNUM * sizeof(struct particle), buffmask);
 	for (int i = 0; i < PNUM; i++)
 	{
-		float third_w = uniform() * TEX_WIDTH;
-		float third_h = uniform() * TEX_HEIGHT;
-		particles[i].pos = glm::vec2(third_w, third_h);
+		glm::vec2 third = glm::normalize(glm::vec2(standardNormal(), standardNormal()));
+		float rad = glm::pow(uniform(), (1.0f / 2.0f)) * radius;
+		third *= rad;
 		/* Get direction to point towards center */
-		particles[i].dir = glm::radians(270.0f);
+		float arcos = glm::acos(third.x/rad);
+		if (third.y >= 0 && rad != 0) arcos += 0;
+		else if (third.y < 0) arcos = -arcos;
+		else if (rad == 0) arcos = 0;
+
+		particles[i].dir = arcos + 3.1415926f;
+		particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
 		particles[i].pad = 0;
 	}
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
