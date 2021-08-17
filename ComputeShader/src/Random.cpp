@@ -1,6 +1,6 @@
 #include "Random.h"
 
-std::mt19937 generator(std::chrono::system_clock::now().time_since_epoch().count());
+std::mt19937 generator((unsigned int)std::chrono::system_clock::now().time_since_epoch().count());
 std::normal_distribution<float> normalDist(0.0f, 1.0f);
 std::uniform_real_distribution<float> uniformDist(0.0f, 1.0f);
 

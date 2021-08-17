@@ -9,27 +9,33 @@
 #include "ComputeShader.h"
 
 void Print_Group_Values();
+void KeyboardHandle(GLFWwindow* window);
 
-const float radius = 200.0f;
+const float radius = 300.0f;
+
+const float o_radius = 300.0f;
+const float i_radius = 200.0f;
+
+const float s_radius = 100.0f;
 
 /* Sensor is in degrees */
-const float SCR_WIDTH = 1080.0f;
-const float SCR_HEIGHT = 1080.0f;
+const float SCR_WIDTH = 1020.0f;
+const float SCR_HEIGHT = 1020.0f;
 
 const float TEX_WIDTH = 1080.0f;
 const float TEX_HEIGHT = 1080.0f;
 
-const float move_dist = 10.0f;
-const float sensor_angle = glm::radians(45.0f);
-const float sensor_dist = 40.0f;
-const float turn_speed = 1.5f;
+float move_dist = 2.0f;
+float sensor_angle = glm::radians(45.0f);
+float sensor_dist = 12.0f;
+float turn_speed = 3.0f;
 
 /* Dissapation and decay */
-const float decay_rate = 0.1f;
-const float blur_factor = 1.0f;
+float decay_rate = 0.1f;
+float blur_factor = 1.0f;
 
 /* Number of Particles */
-const unsigned int PNUM = 1000000;
+const unsigned int PNUM = 600000;
 
 float delta_time = 0.0f;
 float last_frame = 0.0f;
@@ -67,6 +73,7 @@ int main(void)
 	 * vec2 and a scalar will cause issue. Thus the padding
 	 */
 	struct particle {
+		glm::vec4 color;
 		glm::vec2 pos;
 		float dir;
 		float pad;
@@ -84,13 +91,37 @@ int main(void)
 	*/
 	int buffmask = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT;
 	struct particle *particles = (struct particle *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, PNUM * sizeof(struct particle), buffmask);
-	for (int i = 0; i < PNUM; i++)
+	for (int i = 0; i < PNUM / 2; i++)
 	{
+		/* Color */
+		particles[i].color = glm::vec4(0.2f, 0.3f, 0.0f, 1.0f);
+
+		/* Position and direction */
+		float rad_diff = o_radius - i_radius;
 		glm::vec2 third = glm::normalize(glm::vec2(standardNormal(), standardNormal()));
-		float rad = glm::pow(uniform(), (1.0f / 2.0f)) * radius;
+		float rad = (glm::pow(uniform(), (1.0f / 2.0f)) * rad_diff) + i_radius;
 		third *= rad;
 		/* Get direction to point towards center */
 		float arcos = glm::acos(third.x/rad);
+		if (third.y >= 0 && rad != 0) arcos += 0;
+		else if (third.y < 0) arcos = -arcos;
+		else if (rad == 0) arcos = 0;
+
+		particles[i].dir = arcos + 3.1415926f;
+		particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
+		particles[i].pad = 0;
+	}
+	for (int i = PNUM / 2; i < PNUM; i++)
+	{
+		/* Color */
+		particles[i].color = glm::vec4(0.2f, 0.3f, 0.0f, 1.0f);
+
+		/* Position and direction */
+		glm::vec2 third = glm::normalize(glm::vec2(standardNormal(), standardNormal()));
+		float rad = glm::pow(uniform(), (1.0f / 2.0f)) * s_radius;
+		third *= rad;
+		/* Get direction to point towards center */
+		float arcos = glm::acos(third.x / rad);
 		if (third.y >= 0 && rad != 0) arcos += 0;
 		else if (third.y < 0) arcos = -arcos;
 		else if (rad == 0) arcos = 0;
@@ -137,13 +168,6 @@ int main(void)
 
 	/* Create compute shader to update particle positions */
 	ComputeShader p_update("res/shaders/particle_update.shader");
-	p_update.Bind();
-	p_update.SetUniform1f("width", TEX_WIDTH);
-	p_update.SetUniform1f("height", TEX_HEIGHT);
-	p_update.SetUniform1f("move_dist", move_dist);
-	p_update.SetUniform1f("sensor_dist", sensor_dist);
-	p_update.SetUniform1f("sensor_angle", sensor_angle);
-	p_update.SetUniform1f("turn_speed", turn_speed);
 
 	/* Create diffuse and decay compute shader */
 	ComputeShader decay("res/shaders/trail_update.shader");
@@ -201,11 +225,19 @@ int main(void)
 		delta_time = curr_frame - last_frame;
 		last_frame = curr_frame;
 
+		KeyboardHandle(window);
+
 		/* Render here */
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		/* Call particle update compute shader */
 		p_update.Bind();
+		p_update.SetUniform1f("width", TEX_WIDTH);
+		p_update.SetUniform1f("height", TEX_HEIGHT);
+		p_update.SetUniform1f("move_dist", move_dist);
+		p_update.SetUniform1f("sensor_dist", sensor_dist);
+		p_update.SetUniform1f("sensor_angle", sensor_angle);
+		p_update.SetUniform1f("turn_speed", turn_speed);
 		p_update.SetUniform1f("delta_time", delta_time);
 		glDispatchCompute(PNUM, 1, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
@@ -264,4 +296,40 @@ void Print_Group_Values()
 	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_invocations);
 	std::cout << "Max invocations: " << work_grp_invocations << std::endl;
 	// Output 1024
+}
+
+void KeyboardHandle(GLFWwindow *window)
+{
+	if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
+
+	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+		move_dist += 5.0f;
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		move_dist -= 5.0f;
+
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		sensor_angle += 1.0f;
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		sensor_angle -= 1.0f;
+
+	if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+		sensor_dist += 1.0f;
+	if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+		sensor_dist -= 1.0f;
+
+	if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
+		turn_speed += 0.2f;
+	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
+		turn_speed -= 0.2f;
+
+	if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
+		decay_rate += 0.01f;
+	if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+		decay_rate -= 0.01f;
+
+	if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
+		blur_factor += 0.1f;
+	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
+		blur_factor -= 0.1f;
 }

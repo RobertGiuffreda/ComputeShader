@@ -1,0 +1,7 @@
+Move Distance 	-> Q, W
+Sensor Angle	-> A, S
+Sensor Distance	-> Z, X
+Turn Speed	-> O, P
+
+Decay Rate	-> K, L
+Blur Factor	-> N, M
