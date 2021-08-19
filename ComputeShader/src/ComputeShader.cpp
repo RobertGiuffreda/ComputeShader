@@ -3,7 +3,7 @@
 #include <string>
 #include <sstream>
 
-#include "Renderer.h"
+#include <glad/glad.h>
 #include "ComputeShader.h"
 
 ComputeShader::ComputeShader(const std::string& filepath)

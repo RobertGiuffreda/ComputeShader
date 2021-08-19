@@ -3,7 +3,7 @@
 #include <string>
 #include <sstream>
 
-#include "Renderer.h"
+#include <glad/glad.h>
 #include "Shader.h"
 
 Shader::Shader(const std::string& vertpath, const std::string& fragpath)

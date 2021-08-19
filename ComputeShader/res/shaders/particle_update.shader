@@ -62,7 +62,7 @@ void main()
 	uint gid = gl_GlobalInvocationID.x;
 
 	// float random = p_map[gid].pos.y * gid * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x * p_map[gid].pos.y * 1000);
-	float random = p_map[gid].pos.y * gid * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x * p_map[gid].pos.y* 1000);
+	float random = p_map[gid].pos.y * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x + p_map[gid].pos.y + gid);
 
 	/* Sensing Code */
 	float random_turn = hash(random) * 2 * 3.1415f;

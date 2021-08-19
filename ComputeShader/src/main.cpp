@@ -14,28 +14,28 @@ void KeyboardHandle(GLFWwindow* window);
 const float radius = 300.0f;
 
 const float o_radius = 300.0f;
-const float i_radius = 200.0f;
+const float i_radius = 10.0f;
 
-const float s_radius = 100.0f;
+const float s_radius = 50.0f;
 
 /* Sensor is in degrees */
 const float SCR_WIDTH = 1020.0f;
-const float SCR_HEIGHT = 1020.0f;
+const float SCR_HEIGHT = 680.0f;
 
 const float TEX_WIDTH = 1080.0f;
-const float TEX_HEIGHT = 1080.0f;
+const float TEX_HEIGHT = 720.0f;
 
-float move_dist = 2.0f;
+float move_dist = 60.0f;
 float sensor_angle = glm::radians(45.0f);
-float sensor_dist = 12.0f;
-float turn_speed = 3.0f;
+float sensor_dist = 80.0f;
+float turn_speed = 2.0f;
 
 /* Dissapation and decay */
-float decay_rate = 0.1f;
+float decay_rate = 0.7f;
 float blur_factor = 1.0f;
 
 /* Number of Particles */
-const unsigned int PNUM = 600000;
+const unsigned int PNUM = 2000000;
 
 float delta_time = 0.0f;
 float last_frame = 0.0f;
@@ -91,10 +91,10 @@ int main(void)
 	*/
 	int buffmask = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT;
 	struct particle *particles = (struct particle *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, PNUM * sizeof(struct particle), buffmask);
-	for (int i = 0; i < PNUM / 2; i++)
+	for (int i = 0; i < PNUM; i++)
 	{
 		/* Color */
-		particles[i].color = glm::vec4(0.2f, 0.3f, 0.0f, 1.0f);
+		particles[i].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 		/* Position and direction */
 		float rad_diff = o_radius - i_radius;
@@ -107,29 +107,30 @@ int main(void)
 		else if (third.y < 0) arcos = -arcos;
 		else if (rad == 0) arcos = 0;
 
-		particles[i].dir = arcos + 3.1415926f;
+		particles[i].dir = arcos + 3.141592;
 		particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
+		// particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
 		particles[i].pad = 0;
 	}
-	for (int i = PNUM / 2; i < PNUM; i++)
-	{
-		/* Color */
-		particles[i].color = glm::vec4(0.2f, 0.3f, 0.0f, 1.0f);
+	//for (int i = PNUM / 2; i < PNUM; i++)
+	//{
+	//	/* Color */
+	//	particles[i].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-		/* Position and direction */
-		glm::vec2 third = glm::normalize(glm::vec2(standardNormal(), standardNormal()));
-		float rad = glm::pow(uniform(), (1.0f / 2.0f)) * s_radius;
-		third *= rad;
-		/* Get direction to point towards center */
-		float arcos = glm::acos(third.x / rad);
-		if (third.y >= 0 && rad != 0) arcos += 0;
-		else if (third.y < 0) arcos = -arcos;
-		else if (rad == 0) arcos = 0;
+	//	/* Position and direction */
+	//	glm::vec2 third = glm::normalize(glm::vec2(standardNormal(), standardNormal()));
+	//	float rad = glm::pow(uniform(), (1.0f / 2.0f)) * s_radius;
+	//	third *= rad;
+	//	/* Get direction to point towards center */
+	//	float arcos = glm::acos(third.x / rad);
+	//	if (third.y >= 0 && rad != 0) arcos += 0;
+	//	else if (third.y < 0) arcos = -arcos;
+	//	else if (rad == 0) arcos = 0;
 
-		particles[i].dir = arcos + 3.1415926f;
-		particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
-		particles[i].pad = 0;
-	}
+	//	particles[i].dir = arcos + 3.1415926f;
+	//	particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
+	//	particles[i].pad = 0;
+	//}
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
 	/* Bind the buffer to binding = 1 so the compute shader can see it */
@@ -308,15 +309,16 @@ void KeyboardHandle(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 		move_dist -= 5.0f;
 
+
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		sensor_angle += 1.0f;
+		sensor_dist += 5.0f;
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		sensor_angle -= 1.0f;
+		sensor_dist -= 5.0f;
 
 	if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
-		sensor_dist += 1.0f;
+		sensor_angle += 1.0f;
 	if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
-		sensor_dist -= 1.0f;
+		sensor_angle -= 1.0f;
 
 	if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
 		turn_speed += 0.2f;
