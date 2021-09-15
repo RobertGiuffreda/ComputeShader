@@ -19,19 +19,19 @@ const float i_radius = 10.0f;
 const float s_radius = 50.0f;
 
 /* Sensor is in degrees */
-const float SCR_WIDTH = 1020.0f;
-const float SCR_HEIGHT = 680.0f;
+const float SCR_WIDTH = 720.0f;
+const float SCR_HEIGHT = 720.0f;
 
-const float TEX_WIDTH = 1080.0f;
+const float TEX_WIDTH = 720.0f;
 const float TEX_HEIGHT = 720.0f;
 
-float move_dist = 60.0f;
+float move_dist = 10.0f;
 float sensor_angle = glm::radians(45.0f);
-float sensor_dist = 80.0f;
-float turn_speed = 2.0f;
+float sensor_dist = 50.0f;
+float turn_speed = 0.3f;
 
 /* Dissapation and decay */
-float decay_rate = 0.7f;
+float decay_rate = 0.4f;
 float blur_factor = 1.0f;
 
 /* Number of Particles */
@@ -82,7 +82,7 @@ int main(void)
 	unsigned int ssbo = 0;
 	glGenBuffers(1, &ssbo);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(particle) * PNUM, nullptr, GL_DYNAMIC_COPY);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(struct particle) * PNUM, nullptr, GL_DYNAMIC_COPY);
 
 	/*
 	* Map buffer to make to addressable by the cpu. Get the address of the buffer in memory 
@@ -112,25 +112,6 @@ int main(void)
 		// particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
 		particles[i].pad = 0;
 	}
-	//for (int i = PNUM / 2; i < PNUM; i++)
-	//{
-	//	/* Color */
-	//	particles[i].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	//	/* Position and direction */
-	//	glm::vec2 third = glm::normalize(glm::vec2(standardNormal(), standardNormal()));
-	//	float rad = glm::pow(uniform(), (1.0f / 2.0f)) * s_radius;
-	//	third *= rad;
-	//	/* Get direction to point towards center */
-	//	float arcos = glm::acos(third.x / rad);
-	//	if (third.y >= 0 && rad != 0) arcos += 0;
-	//	else if (third.y < 0) arcos = -arcos;
-	//	else if (rad == 0) arcos = 0;
-
-	//	particles[i].dir = arcos + 3.1415926f;
-	//	particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
-	//	particles[i].pad = 0;
-	//}
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
 	/* Bind the buffer to binding = 1 so the compute shader can see it */
@@ -182,7 +163,7 @@ int main(void)
 	/* Create shader to display texture */
 	Shader shader("res/shaders/vertex.shader", "res/shaders/fragment.shader");
 	shader.Bind();
-	shader.SetUniform1i("particle_tex", 0);
+	shader.SetUniform1i("noise", 0);
 
 	/* Vertices of polygon to display texture */
 	float screen_poly[] = {
@@ -240,8 +221,15 @@ int main(void)
 		p_update.SetUniform1f("sensor_angle", sensor_angle);
 		p_update.SetUniform1f("turn_speed", turn_speed);
 		p_update.SetUniform1f("delta_time", delta_time);
+		p_update.SetUniform1f("time", glfwGetTime());
 		glDispatchCompute(PNUM, 1, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+
+		/* Display Screen Sized Texture */
+		shader.Bind();
+		glBindVertexArray(vao);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
 		/* Call trail map update compute shader */
 		decay.Bind();
@@ -253,16 +241,6 @@ int main(void)
 		copy.Bind();
 		glDispatchCompute((unsigned int)TEX_WIDTH, (unsigned int)TEX_HEIGHT, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		/* Texture stuff might not be necessary. P-sure its not actually */
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, trail_map);
-
-		/* Display Screen Sized Texture */
-		shader.Bind();
-		glBindVertexArray(vao);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 		
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);

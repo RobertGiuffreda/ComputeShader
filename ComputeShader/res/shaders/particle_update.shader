@@ -22,15 +22,35 @@ uniform float sensor_angle;
 uniform float sensor_dist;
 uniform float turn_speed;
 uniform float delta_time;
+uniform float time;
 
-// Hash11 from https://www.shadertoy.com/view/4djSRW
-float hash(float p)
+//// Hash11 from https://www.shadertoy.com/view/4djSRW
+//float hash(float p)
+//{
+//	p = fract(p * .1031);
+//	p *= p + 33.33;
+//	p *= p + p;
+//	return fract(p);
+//}
+
+// Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
+uint hash(uint state)
 {
-	p = fract(p * .1031);
-	p *= p + 33.33;
-	p *= p + p;
-	return fract(p);
+	state ^= 2747636419u;
+	state *= 2654435769u;
+	state ^= state >> 16;
+	state *= 2654435769u;
+	state ^= state >> 16;
+	state *= 2654435769u;
+	return state;
 }
+
+
+float uni_r(uint s)
+{
+	return float(s) / 4294967295.0;
+}
+
 
 float check(particle p, float angle)
 {
@@ -61,11 +81,12 @@ void main()
 {
 	uint gid = gl_GlobalInvocationID.x;
 
-	// float random = p_map[gid].pos.y * gid * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x * p_map[gid].pos.y * 1000);
-	float random = p_map[gid].pos.y * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x + p_map[gid].pos.y + gid);
+	//float random = p_map[gid].pos.y * gid * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x * p_map[gid].pos.y * 1000);
+	//float random = p_map[gid].pos.y * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x + p_map[gid].pos.y + gid);
+	uint random = hash(uint(p_map[gid].pos.y * width + p_map[gid].pos.x + hash(uint(gid + time * 10000.0f))));
 
 	/* Sensing Code */
-	float random_turn = hash(random) * 2 * 3.1415f;
+	float random_turn = uni_r(random) * 2 * 3.1415f;
 
 	/* Sensing Code */
 	float left_c = check(p_map[gid], sensor_angle);
@@ -99,7 +120,8 @@ void main()
 	{
 		n_pos.x = min(width - 0.01f, max(n_pos.x, 0.0f));
 		n_pos.y = min(height - 0.01f, max(n_pos.y, 0.0f));
-		p_map[gid].dir = hash(random) * 6.28;
+		random = hash(random);
+		p_map[gid].dir = uni_r(random) * 6.28;
 	}
 
 	// Update the ssbo's data with new data

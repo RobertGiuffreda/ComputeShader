@@ -1,12 +1,12 @@
-#version 330
+#version 430
 
 out vec4 color;
 
 in vec2 tex_coord;
 
-uniform sampler2D particle_tex;
+uniform sampler2D noise;
 
 void main()
 {
-	color = texture(particle_tex, tex_coord);
+	color = texture(noise, tex_coord);
 }
