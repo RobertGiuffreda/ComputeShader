@@ -1,3 +1,7 @@
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
+
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
@@ -22,16 +26,17 @@ const float s_radius = 50.0f;
 const float SCR_WIDTH = 720.0f;
 const float SCR_HEIGHT = 720.0f;
 
-const float TEX_WIDTH = 720.0f;
-const float TEX_HEIGHT = 720.0f;
+const unsigned int TEX_WIDTH = 720.0f;
+const unsigned int TEX_HEIGHT = 720.0f;
 
-float move_dist = 10.0f;
-float sensor_angle = glm::radians(45.0f);
-float sensor_dist = 50.0f;
-float turn_speed = 0.3f;
+float move_dist = 1.0f;
+float sensor_angle = 45.0f;
+float sensor_dist = 5.0f;
+float turn_speed = 0.5f;
+float deposit = 1.0f;
 
 /* Dissapation and decay */
-float decay_rate = 0.4f;
+float decay_rate = 0.8f;
 float blur_factor = 1.0f;
 
 /* Number of Particles */
@@ -107,9 +112,14 @@ int main(void)
 		else if (third.y < 0) arcos = -arcos;
 		else if (rad == 0) arcos = 0;
 
+		// Position for circle
 		particles[i].dir = arcos + 3.141592;
 		particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
-		// particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
+
+		// Random position
+		//particles[i].dir = glm::radians(uniform() * 360.0f);
+		//particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
+
 		particles[i].pad = 0;
 	}
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
@@ -153,12 +163,8 @@ int main(void)
 
 	/* Create diffuse and decay compute shader */
 	ComputeShader decay("res/shaders/trail_update.shader");
-	decay.Bind();
-	decay.SetUniform1f("decay_rate", decay_rate);
-	decay.SetUniform1f("blur_factor", blur_factor);
 
 	ComputeShader copy("res/shaders/copy_texture.shader");
-	copy.Bind();
 
 	/* Create shader to display texture */
 	Shader shader("res/shaders/vertex.shader", "res/shaders/fragment.shader");
@@ -199,8 +205,12 @@ int main(void)
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 
+	/* ImGui Initialization */
+	ImGui::CreateContext();
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init();
+
 	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-	/* Loop until user closes the window */
 	while (!glfwWindowShouldClose(window))
 	{
 		float curr_frame = (float)glfwGetTime();
@@ -209,20 +219,34 @@ int main(void)
 
 		KeyboardHandle(window);
 
-		/* Render here */
+		ImGui_ImplGlfw_NewFrame();
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::SliderFloat("Speed", &move_dist, 0.0f, 20.0f);
+		ImGui::SliderFloat("Sensor Range", &sensor_dist, 0.0f, 100.0f);
+		ImGui::SliderFloat("Sensor Angle", &sensor_angle, 30.0f, 60.0f);
+		ImGui::SliderFloat("Turn Speed", &turn_speed, 0.0f, 1.0f);
+		ImGui::SliderFloat("Deposit", &deposit, 0.0f, 5.0f);
+		ImGui::SliderFloat("Blur", &blur_factor, 0.0f, 1.0f);
+		ImGui::SliderFloat("Decay", &decay_rate, 0.0f, 1.0f);
+
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		/* Call particle update compute shader */
 		p_update.Bind();
 		p_update.SetUniform1f("width", TEX_WIDTH);
 		p_update.SetUniform1f("height", TEX_HEIGHT);
+
 		p_update.SetUniform1f("move_dist", move_dist);
 		p_update.SetUniform1f("sensor_dist", sensor_dist);
-		p_update.SetUniform1f("sensor_angle", sensor_angle);
+		p_update.SetUniform1f("sensor_angle", glm::radians(sensor_angle));
 		p_update.SetUniform1f("turn_speed", turn_speed);
+		p_update.SetUniform1f("deposit", deposit);
+
 		p_update.SetUniform1f("delta_time", delta_time);
 		p_update.SetUniform1f("time", glfwGetTime());
-		glDispatchCompute(PNUM, 1, 1);
+		glDispatchCompute(PNUM/16, 1, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
 		/* Display Screen Sized Texture */
@@ -234,13 +258,18 @@ int main(void)
 		/* Call trail map update compute shader */
 		decay.Bind();
 		decay.SetUniform1f("delta_time", delta_time);
-		glDispatchCompute((unsigned int)TEX_WIDTH, (unsigned int)TEX_HEIGHT, 1);
+		decay.SetUniform1f("decay_rate", decay_rate);
+		decay.SetUniform1f("blur_factor", blur_factor);
+		glDispatchCompute(TEX_WIDTH/8, TEX_HEIGHT/8, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 		/* Copy blur_map to trail_map */
 		copy.Bind();
-		glDispatchCompute((unsigned int)TEX_WIDTH, (unsigned int)TEX_HEIGHT, 1);
+		glDispatchCompute(TEX_WIDTH/8, TEX_HEIGHT/8, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);
@@ -248,6 +277,11 @@ int main(void)
 		/* Poll for and process events*/
 		glfwPollEvents();
 	}
+
+	ImGui_ImplGlfw_Shutdown();
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui::DestroyContext();
+
 	/* Cleanup OpenGL data structures */
 	glDeleteVertexArrays(1, &vao);
 	glDeleteBuffers(1, &vbo);
@@ -269,47 +303,14 @@ void Print_Group_Values()
 	std::cout << "Max global work group counts x: " << work_grp_cnt[0] << std::endl;
 	std::cout << "Max global work group counts y: " << work_grp_cnt[1] << std::endl;
 	std::cout << "Max global work group counts z: " << work_grp_cnt[2] << std::endl;
-	// All output 65535
 
 	int work_grp_invocations;
 	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_invocations);
 	std::cout << "Max invocations: " << work_grp_invocations << std::endl;
-	// Output 1024
 }
 
 void KeyboardHandle(GLFWwindow *window)
 {
-	if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
-
-	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-		move_dist += 5.0f;
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		move_dist -= 5.0f;
-
-
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		sensor_dist += 5.0f;
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		sensor_dist -= 5.0f;
-
-	if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
-		sensor_angle += 1.0f;
-	if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
-		sensor_angle -= 1.0f;
-
-	if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
-		turn_speed += 0.2f;
-	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
-		turn_speed -= 0.2f;
-
-	if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
-		decay_rate += 0.01f;
-	if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-		decay_rate -= 0.01f;
-
-	if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
-		blur_factor += 0.1f;
-	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
-		blur_factor -= 0.1f;
 }

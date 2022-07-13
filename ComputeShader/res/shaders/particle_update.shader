@@ -8,30 +8,27 @@ struct particle
 	float pad;
 };
 
-layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 layout(rgba32f, binding = 0) uniform image2D trail_map;
 layout(std430, binding = 1) buffer particle_map
 {
 	particle p_map[];
 };
 
+// Boundry Dimensions
 uniform float width;
 uniform float height;
+
+// Particle values
 uniform float move_dist;
 uniform float sensor_angle;
 uniform float sensor_dist;
 uniform float turn_speed;
+uniform float deposit;
+
+// Time values
 uniform float delta_time;
 uniform float time;
-
-//// Hash11 from https://www.shadertoy.com/view/4djSRW
-//float hash(float p)
-//{
-//	p = fract(p * .1031);
-//	p *= p + 33.33;
-//	p *= p + p;
-//	return fract(p);
-//}
 
 // Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
 uint hash(uint state)
@@ -52,25 +49,28 @@ float uni_r(uint s)
 }
 
 
+
 float check(particle p, float angle)
 {
 	float check_angle = p.dir + angle;
 	vec2 check_dir = vec2(cos(check_angle), sin(check_angle));
 
 	vec2 check_pos = p.pos + (check_dir * sensor_dist);
-	int centerX = int(check_pos.x);
-	int centerY = int(check_pos.y);
+	int cx = int(check_pos.x);
+	int cy = int(check_pos.y);
 
 	float sum = 0;
-	vec4 weight = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	vec4 weight = vec4(1.0f);
 
-	for (int offx = -1; offx <= 1; offx++)
+	for (int dx = -1; dx <= 1; dx++)
 	{
-		for (int offy = -1; offy <= 1; offy++)
+		for (int dy = -1; dy <= 1; dy++)
 		{
-			int xval = int(min(width - 1, max(0, centerX + offx)));
-			int yval = int(min(height - 1, max(0, centerY + offy)));
-			sum += dot(weight, imageLoad(trail_map, ivec2(xval, yval)));
+			int x = int(min(width - 1, max(0, cx + dx)));
+			int y = int(min(height - 1, max(0, cy + dy)));
+			sum += dot(weight, imageLoad(trail_map, ivec2(x, y)));
+
+			//sum += dot(weight, imageLoad(trail_map, ivec2(cx + dx, cy + dy)));
 		}
 	}
 
@@ -81,9 +81,7 @@ void main()
 {
 	uint gid = gl_GlobalInvocationID.x;
 
-	//float random = p_map[gid].pos.y * gid * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x * p_map[gid].pos.y * 1000);
-	//float random = p_map[gid].pos.y * gid + p_map[gid].pos.x + hash(p_map[gid].pos.x + p_map[gid].pos.y + gid);
-	uint random = hash(uint(p_map[gid].pos.y * width + p_map[gid].pos.x + hash(uint(gid + time * 10000.0f))));
+	uint random = hash(uint(p_map[gid].pos.x * 32.1331f + p_map[gid].pos.y) + hash(uint(gid + time + delta_time)));
 
 	/* Sensing Code */
 	float random_turn = uni_r(random) * 2 * 3.1415f;
@@ -93,13 +91,10 @@ void main()
 	float right_c = check(p_map[gid], -sensor_angle);
 	float forward_c = check(p_map[gid], 0);
 
-	if (forward_c > left_c && forward_c > right_c)
-	{
-		p_map[gid].dir += 0.0f;
-	}
+	if (forward_c > left_c && forward_c > right_c) {}
 	else if (forward_c < left_c && forward_c < right_c)
 	{
-		p_map[gid].dir += (random_turn - 0.5f) * 2 * turn_speed *delta_time;
+		p_map[gid].dir += (random_turn - 0.5f) * 2 * turn_speed * delta_time;
 	}
 	else if (right_c > left_c)
 	{
@@ -122,12 +117,13 @@ void main()
 		n_pos.y = min(height - 0.01f, max(n_pos.y, 0.0f));
 		random = hash(random);
 		p_map[gid].dir = uni_r(random) * 6.28;
+	} else {
+		ivec2 cd = ivec2(n_pos);
+		vec4 old_trail = imageLoad(trail_map, cd);
+		imageStore(trail_map, cd, old_trail + vec4(deposit * delta_time));
+		// Deposit value accumulates: Should there be a ceiling it reaches??
 	}
 
 	// Update the ssbo's data with new data
 	p_map[gid].pos = n_pos;
-
-	// Color the trailmap depending on new data
-	ivec2 pixel_coords = ivec2(p_map[gid].pos);
-	imageStore(trail_map, pixel_coords, p_map[gid].color);
 }
