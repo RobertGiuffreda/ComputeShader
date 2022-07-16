@@ -40,7 +40,8 @@ float decay_rate = 0.8f;
 float blur_factor = 1.0f;
 
 /* Number of Particles */
-const unsigned int PNUM = 2000000;
+const unsigned int PNUM = 518400;
+const unsigned int group_num = 3;
 
 float delta_time = 0.0f;
 float last_frame = 0.0f;
@@ -78,7 +79,7 @@ int main(void)
 	 * vec2 and a scalar will cause issue. Thus the padding
 	 */
 	struct particle {
-		glm::vec4 color;
+		glm::vec4 mask;
 		glm::vec2 pos;
 		float dir;
 		float pad;
@@ -99,7 +100,7 @@ int main(void)
 	for (int i = 0; i < PNUM; i++)
 	{
 		/* Color */
-		particles[i].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		particles[i].mask = glm::vec4((i%group_num)==0, (i%group_num)==1, (i%group_num)==2, 0.0f);
 
 		/* Position and direction */
 		float rad_diff = o_radius - i_radius;
@@ -113,12 +114,12 @@ int main(void)
 		else if (rad == 0) arcos = 0;
 
 		// Position for circle
-		particles[i].dir = arcos + 3.141592;
-		particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
+		//particles[i].dir = arcos + 3.141592;
+		//particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
 
 		// Random position
-		//particles[i].dir = glm::radians(uniform() * 360.0f);
-		//particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
+		particles[i].dir = glm::radians(uniform() * 360.0f);
+		particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
 
 		particles[i].pad = 0;
 	}
@@ -126,6 +127,23 @@ int main(void)
 
 	/* Bind the buffer to binding = 1 so the compute shader can see it */
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+	struct group_settings {
+		glm::vec4 color;
+	};
+
+	std::vector<group_settings> gs;
+	gs.resize(group_num);
+	for (int i = 0; i < group_num; ++i) {
+		gs[i].color = glm::vec4(i == 0, i == 1, i == 2, i == 3);
+	}
+
+	unsigned int settings_ssbo = 0;
+	glGenBuffers(1, &settings_ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, settings_ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(struct group_settings) * group_num, &gs[0], GL_DYNAMIC_COPY);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, settings_ssbo);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	// Create framebuffer and attach trail_map to use render as a copy
@@ -151,6 +169,16 @@ int main(void)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TEX_WIDTH, TEX_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
 	glBindImageTexture(1, blur_trail_map, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
+	unsigned int color_map;
+	glGenTextures(1, &color_map);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, color_map);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TEX_WIDTH, TEX_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+	glBindImageTexture(2, color_map, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
 	/* Create compute shader to zero the texture */
 	ComputeShader compshader("res/shaders/zero_tex.shader");
@@ -158,18 +186,15 @@ int main(void)
 	glDispatchCompute((unsigned int)TEX_WIDTH, (unsigned int)TEX_HEIGHT, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-	/* Create compute shader to update particle positions */
 	ComputeShader p_update("res/shaders/particle_update.shader");
-
-	/* Create diffuse and decay compute shader */
 	ComputeShader decay("res/shaders/trail_update.shader");
-
 	ComputeShader copy("res/shaders/copy_texture.shader");
+	ComputeShader color("res/shaders/color.shader");
 
 	/* Create shader to display texture */
 	Shader shader("res/shaders/vertex.shader", "res/shaders/fragment.shader");
 	shader.Bind();
-	shader.SetUniform1i("noise", 0);
+	shader.SetUniform1i("color_map", 2);
 
 	/* Vertices of polygon to display texture */
 	float screen_poly[] = {
@@ -248,6 +273,11 @@ int main(void)
 		p_update.SetUniform1f("time", glfwGetTime());
 		glDispatchCompute(PNUM/16, 1, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+
+		color.Bind();
+		color.SetUniform1i("group_num", group_num);
+		glDispatchCompute(TEX_WIDTH / 8, TEX_HEIGHT / 8, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 		/* Display Screen Sized Texture */
 		shader.Bind();

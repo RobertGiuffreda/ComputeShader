@@ -3,6 +3,7 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 layout(rgba32f, binding = 0) uniform image2D trail_map;
 layout(rgba32f, binding = 1) uniform image2D blur_map;
+//layout(rgba32f, binding = 2) uniform image2D color_map;
 
 void main()
 {

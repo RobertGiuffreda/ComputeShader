@@ -2,7 +2,7 @@
 
 struct particle
 {
-	vec4 color;
+	vec4 mask;
 	vec2 pos;
 	float dir;
 	float pad;
@@ -60,7 +60,7 @@ float check(particle p, float angle)
 	int cy = int(check_pos.y);
 
 	float sum = 0;
-	vec4 weight = vec4(1.0f);
+	vec4 sense_mask = p.mask * 2 - vec4(1.0f);
 
 	for (int dx = -1; dx <= 1; dx++)
 	{
@@ -68,7 +68,7 @@ float check(particle p, float angle)
 		{
 			int x = int(min(width - 1, max(0, cx + dx)));
 			int y = int(min(height - 1, max(0, cy + dy)));
-			sum += dot(weight, imageLoad(trail_map, ivec2(x, y)));
+			sum += dot(sense_mask, imageLoad(trail_map, ivec2(x, y)));
 
 			//sum += dot(weight, imageLoad(trail_map, ivec2(cx + dx, cy + dy)));
 		}
@@ -120,8 +120,7 @@ void main()
 	} else {
 		ivec2 cd = ivec2(n_pos);
 		vec4 old_trail = imageLoad(trail_map, cd);
-		imageStore(trail_map, cd, old_trail + vec4(deposit * delta_time));
-		// Deposit value accumulates: Should there be a ceiling it reaches??
+		imageStore(trail_map, cd, min(vec4(1.0f), old_trail + p_map[gid].mask * deposit * delta_time));
 	}
 
 	// Update the ssbo's data with new data

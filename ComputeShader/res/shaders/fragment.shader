@@ -4,9 +4,9 @@ out vec4 color;
 
 in vec2 tex_coord;
 
-uniform sampler2D noise;
+uniform sampler2D color_map;
 
 void main()
 {
-	color = texture(noise, tex_coord);
+	color = texture(color_map, tex_coord);
 }
