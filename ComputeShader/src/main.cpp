@@ -43,6 +43,8 @@ float blur_factor = 1.0f;
 const unsigned int PNUM = 518400;
 const unsigned int group_num = 3;
 
+bool paused = true;
+
 float delta_time = 0.0f;
 float last_frame = 0.0f;
 
@@ -255,48 +257,51 @@ int main(void)
 		ImGui::SliderFloat("Deposit", &deposit, 0.0f, 5.0f);
 		ImGui::SliderFloat("Blur", &blur_factor, 0.0f, 1.0f);
 		ImGui::SliderFloat("Decay", &decay_rate, 0.0f, 1.0f);
+		ImGui::Checkbox("Paused", &paused);
 
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		/* Call particle update compute shader */
-		p_update.Bind();
-		p_update.SetUniform1f("width", TEX_WIDTH);
-		p_update.SetUniform1f("height", TEX_HEIGHT);
+		if (!paused) {
+			p_update.Bind();
+			p_update.SetUniform1f("width", TEX_WIDTH);
+			p_update.SetUniform1f("height", TEX_HEIGHT);
 
-		p_update.SetUniform1f("move_dist", move_dist);
-		p_update.SetUniform1f("sensor_dist", sensor_dist);
-		p_update.SetUniform1f("sensor_angle", glm::radians(sensor_angle));
-		p_update.SetUniform1f("turn_speed", turn_speed);
-		p_update.SetUniform1f("deposit", deposit);
+			p_update.SetUniform1f("move_dist", move_dist);
+			p_update.SetUniform1f("sensor_dist", sensor_dist);
+			p_update.SetUniform1f("sensor_angle", glm::radians(sensor_angle));
+			p_update.SetUniform1f("turn_speed", turn_speed);
+			p_update.SetUniform1f("deposit", deposit);
 
-		p_update.SetUniform1f("delta_time", delta_time);
-		p_update.SetUniform1f("time", glfwGetTime());
-		glDispatchCompute(PNUM/16, 1, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+			p_update.SetUniform1f("delta_time", delta_time);
+			p_update.SetUniform1f("time", glfwGetTime());
+			glDispatchCompute(PNUM / 16, 1, 1);
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
-		color.Bind();
-		color.SetUniform1i("group_num", group_num);
-		glDispatchCompute(TEX_WIDTH / 8, TEX_HEIGHT / 8, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+			color.Bind();
+			color.SetUniform1i("group_num", group_num);
+			glDispatchCompute(TEX_WIDTH / 8, TEX_HEIGHT / 8, 1);
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		}
+			/* Display Screen Sized Texture */
+			shader.Bind();
+			glBindVertexArray(vao);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
-		/* Display Screen Sized Texture */
-		shader.Bind();
-		glBindVertexArray(vao);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+		if (!paused) {
+			/* Call trail map update compute shader */
+			decay.Bind();
+			decay.SetUniform1f("delta_time", delta_time);
+			decay.SetUniform1f("decay_rate", decay_rate);
+			decay.SetUniform1f("blur_factor", blur_factor);
+			glDispatchCompute(TEX_WIDTH / 8, TEX_HEIGHT / 8, 1);
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		/* Call trail map update compute shader */
-		decay.Bind();
-		decay.SetUniform1f("delta_time", delta_time);
-		decay.SetUniform1f("decay_rate", decay_rate);
-		decay.SetUniform1f("blur_factor", blur_factor);
-		glDispatchCompute(TEX_WIDTH/8, TEX_HEIGHT/8, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		/* Copy blur_map to trail_map */
-		copy.Bind();
-		glDispatchCompute(TEX_WIDTH/8, TEX_HEIGHT/8, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+			/* Copy blur_map to trail_map */
+			copy.Bind();
+			glDispatchCompute(TEX_WIDTH / 8, TEX_HEIGHT / 8, 1);
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		}
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
