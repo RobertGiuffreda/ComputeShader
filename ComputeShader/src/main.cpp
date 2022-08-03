@@ -75,6 +75,10 @@ int main(void)
 		return -1;
 	}
 
+	/* Enable alpha value */
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	/*
 	 * Create the Particle map. Shader storage buffer object of particle positions and directions 
 	 * There are issues with padding and Shader Storage Buffer Objects.
@@ -138,7 +142,7 @@ int main(void)
 	std::vector<group_settings> gs;
 	gs.resize(group_num);
 	for (int i = 0; i < group_num; ++i) {
-		gs[i].color = glm::vec4(i == 0, i == 1, i == 2, i == 3);
+		gs[i].color = glm::vec4(i == 0, i == 1, i == 2, 1.0f);
 	}
 
 	unsigned int settings_ssbo = 0;

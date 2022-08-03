@@ -11,11 +11,11 @@ uniform float delta_time;
 void main()
 {
 	ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
-	vec3 sum = vec3(0.0f, 0.0f, 0.0f);
+	vec4 sum = vec4(0.0f);
 	for (int offX = -1; offX <= 1; offX++) {
 		for (int offY = -1; offY <= 1; offY++) {
 			ivec2 tmp_coord = ivec2(pixel_coords.x + offX, pixel_coords.y + offY);
-			vec3 tmp_color = imageLoad(trail_map, tmp_coord).xyz;
+			vec4 tmp_color = imageLoad(trail_map, tmp_coord);
 			if (abs(offX) + abs(offY) == 2) tmp_color *= 1.0f;
 			if (abs(offX) + abs(offY) == 1) tmp_color *= 2.0f;
 			if (abs(offX) + abs(offY) == 0) tmp_color *= 4.0f;
@@ -24,8 +24,8 @@ void main()
 	}
 	sum /= 16.0f;
 
-	sum = mix(imageLoad(trail_map, pixel_coords).xyz, sum, blur_factor * delta_time);
+	sum = mix(imageLoad(trail_map, pixel_coords), sum, blur_factor * delta_time);
 	sum = mix(sum, sum * decay_rate, delta_time);
 
-	imageStore(blur_map, pixel_coords, vec4(sum, 1.0f));
+	imageStore(blur_map, pixel_coords, sum);
 }

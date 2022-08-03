@@ -60,7 +60,7 @@ float check(particle p, float angle)
 	int cy = int(check_pos.y);
 
 	float sum = 0;
-	vec4 sense_mask = p.mask * 2 - vec4(1.0f);
+	vec4 sense_mask = p.mask * 2.0f - vec4(1.0f);
 
 	for (int dx = -1; dx <= 1; dx++)
 	{
