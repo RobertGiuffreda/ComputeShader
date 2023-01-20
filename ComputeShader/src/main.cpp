@@ -23,14 +23,14 @@ const float i_radius = 10.0f;
 const float s_radius = 50.0f;
 
 /* Sensor is in degrees */
-const float SCR_WIDTH = 720.0f;
-const float SCR_HEIGHT = 720.0f;
+const float SCR_WIDTH = 1440.0f;
+const float SCR_HEIGHT = 810.0f;
 
-const unsigned int TEX_WIDTH = 720.0f;
-const unsigned int TEX_HEIGHT = 720.0f;
+const unsigned int TEX_WIDTH = 1920.0f;
+const unsigned int TEX_HEIGHT = 1080.0f;
 
-float move_dist = 1.0f;
-float sensor_angle = 45.0f;
+float move_dist = 30.0f;
+float sensor_angle = 112.0f;
 float sensor_dist = 5.0f;
 float turn_speed = 0.5f;
 float deposit = 1.0f;
@@ -120,12 +120,12 @@ int main(void)
 		else if (rad == 0) arcos = 0;
 
 		// Position for circle
-		//particles[i].dir = arcos + 3.141592;
-		//particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
+		particles[i].dir = arcos + 3.141592;
+		particles[i].pos = third + glm::vec2(TEX_WIDTH / 2, TEX_HEIGHT / 2);
 
 		// Random position
-		particles[i].dir = glm::radians(uniform() * 360.0f);
-		particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
+		//particles[i].dir = glm::radians(uniform() * 360.0f);
+		//particles[i].pos = glm::vec2(uniform() * TEX_WIDTH, uniform() * TEX_HEIGHT);
 
 		particles[i].pad = 0;
 	}
